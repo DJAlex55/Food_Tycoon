@@ -6,6 +6,8 @@ public class BuildManager : MonoBehaviour
 {
     public static BuildManager Instance { get; private set; }
 
+    private List<GridObject> GridObjects;
+
     private GridObject[,] ObjectGrid;
     private Floor[,] FloorGrid;
     private Grid grid;
@@ -168,6 +170,38 @@ public class BuildManager : MonoBehaviour
     }
 
 
+    public void BuildObjectsFromSave(Save save)
+    {
+        if(save == null)
+        {
+            Debug.LogError("Save is null!");
+            return;
+        }
+
+        GridObjectSaveData[] ObjectsToBuildDATA = save.GridObjects;
+
+        if(ObjectsToBuildDATA.Length <= 0)
+        {
+            Debug.Log("No GridObjects to build!");
+            return;
+        }
+
+
+        foreach (GridObjectSaveData objectToBuild in ObjectsToBuildDATA)
+        {
+            GridObjectID ID = (GridObjectID)objectToBuild.ID;
+            NodeGridPosition GridPos = new NodeGridPosition(objectToBuild.x, objectToBuild.y);
+            int Rot = objectToBuild.Rot;
+
+            if (!BuildObject(ID, GridPos, Rot))
+                Debug.LogWarning("SomeThing Went Wrong!");
+
+        }
+
+        Debug.Log("Done!");
+
+    }
+    
     private bool BuildObject(NodeGridPosition GridPos)
     {
         if (!BuildMode || GridPos == NodeGridPosition.Null || CheckIfOccupied(GetOccupiedNodes(GridPos)))
@@ -191,13 +225,15 @@ public class BuildManager : MonoBehaviour
         Quaternion Rot = Quaternion.Euler(0f, ObjectToBuildRotation * 90f, 0f);
         
 
-        GridObject gridObj = Instantiate(GridObjectToBuild.Prefab, WorldPos, Rot);
-        gridObj.GridPos = GridPos;
-        gridObj.Rot = ObjectToBuildRotation;
+        GridObject GridObj = Instantiate(GridObjectToBuild.Prefab, WorldPos, Rot);
+        GridObj.GridPos = GridPos;
+        GridObj.Rot = ObjectToBuildRotation;
+
+        GridObjects.Add(GridObj);
 
         if (GridObjectToBuild.ID == GridObjectID.wall)
         {
-            Wall wall = gridObj.GetComponent<Wall>();
+            Wall wall = GridObj.GetComponent<Wall>();
             if (wall != null)
             {
                 wall.transform.SetParent(WallParent);
@@ -207,12 +243,12 @@ public class BuildManager : MonoBehaviour
         }
 
         //If the size of the object is more that 1 in any axis
-        if (gridObj.Size.x > 1 && gridObj.Size.y > 1)
+        if (GridObj.Size.x > 1 && GridObj.Size.y > 1)
         {
             //We go through all the occupied nodes to tell them they have been occupied
-            foreach (NodeGridPosition OccupiedGridPosition in gridObj.GetOccupiedNodes())
+            foreach (NodeGridPosition OccupiedGridPosition in GridObj.GetOccupiedNodes())
             {
-                ObjectGrid[OccupiedGridPosition.x, OccupiedGridPosition.y] = gridObj;
+                ObjectGrid[OccupiedGridPosition.x, OccupiedGridPosition.y] = GridObj;
                 Node occupiedNode = grid.grid[OccupiedGridPosition.x, OccupiedGridPosition.y];
                 occupiedNode.Occupied = true;
                 occupiedNode.UpdateWalkable();
@@ -220,7 +256,150 @@ public class BuildManager : MonoBehaviour
         }
         else
         {
-            ObjectGrid[GridPos.x, GridPos.y] = gridObj;
+            ObjectGrid[GridPos.x, GridPos.y] = GridObj;
+            Node node = grid.grid[GridPos.x, GridPos.y];
+            node.Occupied = true;
+            node.UpdateWalkable();
+        }
+
+
+
+        return true;
+    }
+
+
+    //WARNING! NO BUILDMODE CHECK
+    private bool BuildObject(GridObjectID ID, NodeGridPosition GridPos, int Rot)
+    {
+        if (GridPos == NodeGridPosition.Null || CheckIfOccupied(GetOccupiedNodes(GridPos)))
+            return false;
+
+        GridObjectData ObjectData = IDManager.Instance.GetData(ID);
+
+        if (ObjectData == null)
+        {
+            Debug.LogError("ObjectData is null!");
+            return false;
+        }
+
+
+
+        Vector3 WorldPos = Grid.GetWorldPointFromNodeGridPosition(GridPos);
+
+        while (Rot < 0)
+            Rot += 4;
+
+        Rot %= 4;
+
+        Quaternion Rotation = Quaternion.Euler(0f, Rot * 90f, 0f);
+
+
+        GridObject GridObj = Instantiate(ObjectData.Prefab, WorldPos, Rotation);
+        GridObj.GridPos = GridPos;
+        GridObj.Rot = Rot;
+
+        GridObjects.Add(GridObj);
+
+        if (ID == GridObjectID.wall)
+        {
+            Wall wall = GridObj.GetComponent<Wall>();
+            if (wall != null)
+            {
+                wall.transform.SetParent(WallParent);
+                wall.ShowUpWall(AllWallsShowing);
+                AddWall(wall);
+            }
+        }
+
+        //If the size of the object is more that 1 in any axis
+        if (GridObj.Size.x > 1 && GridObj.Size.y > 1)
+        {
+            //We go through all the occupied nodes to tell them they have been occupied
+            foreach (NodeGridPosition OccupiedGridPosition in GridObj.GetOccupiedNodes())
+            {
+                ObjectGrid[OccupiedGridPosition.x, OccupiedGridPosition.y] = GridObj;
+                Node occupiedNode = grid.grid[OccupiedGridPosition.x, OccupiedGridPosition.y];
+                occupiedNode.Occupied = true;
+                occupiedNode.UpdateWalkable();
+            }
+        }
+        else
+        {
+            ObjectGrid[GridPos.x, GridPos.y] = GridObj;
+            Node node = grid.grid[GridPos.x, GridPos.y];
+            node.Occupied = true;
+            node.UpdateWalkable();
+        }
+
+
+
+        return true;
+    }
+
+    //WARNING! NO BUILDMODE CHECK
+    private bool BuildObject(GridObjectSaveData GridObjectSavedData)
+    {
+        if (GridObjectSavedData == null)
+            return false;
+
+        GridObjectID ID = (GridObjectID)GridObjectSavedData.ID;
+        NodeGridPosition GridPos = new NodeGridPosition(GridObjectSavedData.x, GridObjectSavedData.y);
+        int Rot = GridObjectSavedData.Rot;
+
+        GridObjectData ObjectData = IDManager.Instance.GetData(GridObjectSavedData.ID);
+
+        if (ObjectData == null)
+        {
+            Debug.LogError("ObjectData is null!");
+            return false;
+        }
+
+        if (CheckIfOccupied(GetOccupiedNodes(GridPos)) || GridPos == NodeGridPosition.Null)
+            return false;
+        
+
+        Vector3 WorldPos = Grid.GetWorldPointFromNodeGridPosition(GridPos);
+
+        while (Rot < 0)
+            Rot += 4;
+
+        Rot %= 4;
+
+        Quaternion Rotation = Quaternion.Euler(0f, Rot * 90f, 0f);
+
+
+        GridObject GridObj = Instantiate(ObjectData.Prefab, WorldPos, Rotation);
+        GridObj.GridPos = GridPos;
+        GridObj.Rot = Rot;
+
+        GridObjects.Add(GridObj);
+
+        if (ID == GridObjectID.wall)
+        {
+            Wall wall = GridObj.GetComponent<Wall>();
+            if (wall != null)
+            {
+                wall.transform.SetParent(WallParent);
+                wall.ShowUpWall(AllWallsShowing);
+                AddWall(wall);
+            }
+        }
+
+        //If the size of the object is more that 1 in any axis
+        if (GridObj.Size.x > 1 && GridObj.Size.y > 1)
+        {
+            //We go through all the occupied nodes to tell them they have been occupied
+            foreach (NodeGridPosition OccupiedGridPosition in GridObj.GetOccupiedNodes())
+            {
+                ObjectGrid[OccupiedGridPosition.x, OccupiedGridPosition.y] = GridObj;
+                Node occupiedNode = grid.grid[OccupiedGridPosition.x, OccupiedGridPosition.y];
+                occupiedNode.Occupied = true;
+                occupiedNode.UpdateWalkable();
+            }
+        }
+        else
+        {
+            ObjectGrid[GridPos.x, GridPos.y] = GridObj;
             Node node = grid.grid[GridPos.x, GridPos.y];
             node.Occupied = true;
             node.UpdateWalkable();
@@ -266,6 +445,7 @@ public class BuildManager : MonoBehaviour
         if (GridObj == null || !BullDozerMode || !BuildMode )
             return false;
 
+        GridObjects.Remove(GridObj);
 
         List<NodeGridPosition> NodesOccupied = GridObj.GetOccupiedNodes();
 
@@ -292,6 +472,7 @@ public class BuildManager : MonoBehaviour
         if (GridObj == null)
             return false;
 
+        GridObjects.Remove(GridObj);
 
         List<NodeGridPosition> NodesOccupied = GridObj.GetOccupiedNodes();
 
@@ -321,6 +502,10 @@ public class BuildManager : MonoBehaviour
 
     #endregion
 
+    public List<GridObject> GetAllGridObject()
+    {
+        return GridObjects;
+    }
 
     public List<NodeGridPosition> GetOccupiedNodes(NodeGridPosition GridPos)
     {
