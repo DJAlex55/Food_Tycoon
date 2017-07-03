@@ -5,6 +5,7 @@ using UnityEngine;
 public class EntityManager : MonoBehaviour
 {
     public static EntityManager Instance { get; private set; }
+    [SerializeField] private LayerMask EntityLayer;
 
     //TODO: remove the [SerializeField] once the mechanic to select current entity is done
     [SerializeField] private Entity CurrentEnity;
@@ -31,7 +32,7 @@ public class EntityManager : MonoBehaviour
     public void SetCurrentEntity(Entity _Entity)
     {
         if (_Entity == null)
-            return;
+            Debug.Log("CurrentEnity set to null!");
 
         CurrentEnity = _Entity;
     }

@@ -6,11 +6,14 @@ public class Entity : MonoBehaviour
     private Vector3 target;
     public float Speed = 20;
 
+    private Coroutine FollowPathCoroutine;
+
     Vector3[] path = new Vector3[0];
     int targetIndex;
 
     float InteractRange = 0.5f;
-
+    
+    [SerializeField] private float MaxDegreeSpeed = 90;
 
     private void Awake()
     {
@@ -32,9 +35,10 @@ public class Entity : MonoBehaviour
         targetIndex = 0;
         path = NewPath;
 
-        StopCoroutine(FollowPath());
+        if(FollowPathCoroutine != null)
+            StopCoroutine(FollowPathCoroutine);
 
-        StartCoroutine(FollowPath());
+        FollowPathCoroutine = StartCoroutine(FollowPath());
     }
 
 
@@ -49,7 +53,7 @@ public class Entity : MonoBehaviour
 
         while (path.Length > 0)
         {
-            if(Vector3.Distance(transform.position,CurrentWaypoint) <= .1f)
+            if(transform.position == CurrentWaypoint)
             {
                 targetIndex++;
                 if(targetIndex >= path.Length)
@@ -60,10 +64,16 @@ public class Entity : MonoBehaviour
                 CurrentWaypoint = path[targetIndex];
             }
 
-            transform.position = Vector3.MoveTowards(transform.position, CurrentWaypoint, Speed * Time.deltaTime);
-            transform.LookAt(CurrentWaypoint, Vector3.up);
+            Quaternion TargetRotation = Quaternion.LookRotation(CurrentWaypoint - transform.position); 
+            
+            transform.rotation = Quaternion.RotateTowards(transform.rotation, TargetRotation, MaxDegreeSpeed * Time.deltaTime);
 
             transform.eulerAngles = new Vector3(0f, transform.eulerAngles.y , 0f );
+
+            //I know this is better if put higher up BUT leave it here. I have my motivations
+            transform.position = Vector3.MoveTowards(transform.position, CurrentWaypoint, Speed * Time.deltaTime);
+
+
             yield return null;
         }
         yield break;
