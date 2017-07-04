@@ -6,7 +6,7 @@ public class BuildManager : MonoBehaviour
 {
     public static BuildManager Instance { get; private set; }
 
-    private List<GridObject> GridObjects;
+    private List<GridObject> GridObjects = new List<GridObject>();
 
     private GridObject[,] ObjectGrid;
     private Floor[,] FloorGrid;
@@ -15,7 +15,7 @@ public class BuildManager : MonoBehaviour
     [SerializeField] private Transform WallParent;
     [SerializeField] private Transform FloorParent;
 
-    private GridObjectData GridObjectToBuild;
+    public GridObjectData GridObjectToBuild { get; private set; }
     private NodeGridPosition ObjectToBuildSize;
     /// <summary>
     /// every 1 equals a 90 clockwise degree rotation
@@ -80,6 +80,7 @@ public class BuildManager : MonoBehaviour
     private void CreateGrid()
     {
         ObjectGrid = new GridObject[grid.GridSize.x, grid.GridSize.y];
+        FloorGrid = new Floor[grid.GridSize.x, grid.GridSize.y];
     }
 
 
@@ -204,7 +205,7 @@ public class BuildManager : MonoBehaviour
     
     private bool BuildObject(NodeGridPosition GridPos)
     {
-        if (!BuildMode || GridPos == NodeGridPosition.Null || CheckIfOccupied(GetOccupiedNodes(GridPos)))
+        if (!BuildMode || GridPos == NodeGridPosition.Null)
             return false;
 
         if (GridObjectToBuild == null)
@@ -213,7 +214,9 @@ public class BuildManager : MonoBehaviour
             return false;
         }
 
-
+        if (GridObjectToBuild.ID != GridObjectID.Floor && CheckIfOccupied(GetOccupiedNodes(GridPos)))
+            return false;
+            
 
         Vector3 WorldPos = Grid.GetWorldPointFromNodeGridPosition(GridPos);
         
@@ -226,7 +229,10 @@ public class BuildManager : MonoBehaviour
         
 
         GridObject GridObj = Instantiate(GridObjectToBuild.Prefab, WorldPos, Rot);
-        GridObj.GridPos = GridPos;
+        
+        GridObj.GridPos = new NodeGridPosition( GridPos.x, GridPos.y);
+
+        Debug.Log("After: " + GridObj.GridPos.x + ", " + GridObj.GridPos.y);
         GridObj.Rot = ObjectToBuildRotation;
 
         GridObjects.Add(GridObj);
@@ -260,9 +266,7 @@ public class BuildManager : MonoBehaviour
             Node node = grid.grid[GridPos.x, GridPos.y];
             node.Occupied = true;
             node.UpdateWalkable();
-        }
-
-
+        }        
 
         return true;
     }
@@ -559,6 +563,7 @@ public class BuildManager : MonoBehaviour
         return OccupiedNodes;
     }
 
+    //TODO: Make a version of this for floors
     public bool CheckIfOccupied(List<NodeGridPosition> NodesGridPositionTocheck)
     {
         foreach (NodeGridPosition GridPos in NodesGridPositionTocheck)

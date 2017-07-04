@@ -86,10 +86,10 @@ public class GridObject : MonoBehaviour
 
             }
         }
-        Debug.Log("OccupiedNodes: " + OccupiedNodes[0]);
         return OccupiedNodes;
     }
 
+   
 
     public GridObjectData GetData()
     {
